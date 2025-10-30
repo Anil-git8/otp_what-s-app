@@ -12,6 +12,11 @@ app.use(cors());
 
 const { PORT, API_KEY, PHONE_NUMBER_ID, TEMPLATE_NAME, FINANALYZ_API } = process.env;
 
+app.get("/health", (req, res) => {
+  res.status(200).send("✅ Server is awake!");
+});
+
+
 // ✅ Send OTP
 app.post('/send-otp', async (req, res) => {
   const { phone } = req.body;
