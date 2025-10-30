@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WhatsApp OTP Verification</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 400px; margin: 40px auto; }
+  h1 { text-align: center; }
+  .hidden { display: none; }
+  .form-group { margin-bottom: 1rem; }
+  input, button {
+    width: 100%; padding: 0.6rem; font-size: 1rem; margin-top: 0.3rem;
+  }
+  button { background: #2b7a2b; color: #fff; border: none; cursor: pointer; }
+  button:hover { background: #256525; }
+  #msg { margin-top: 1rem; text-align: center; }
+</style>
+</head>
+<body>
+
+<h1>WhatsApp OTP Verification</h1>
+
+<div id="step1">
+  <div class="form-group">
+    <label>WhatsApp Number (with country code)</label>
+    <input type="text" id="phone" placeholder="+91XXXXXXXXXX" />
+  </div>
+  <button onclick="sendOtp()">Send OTP</button>
+</div>
+
+<div id="step2" class="hidden">
+  <div class="form-group">
+    <label>Enter OTP</label>
+    <input type="text" id="otp" placeholder="6-digit OTP" />
+  </div>
+  <button onclick="verifyOtp()">Verify OTP</button>
+</div>
+
+<p id="msg"></p>
+
+<script>
+  const backend = 'http://localhost:3000'; // update to your deployed backend URL
+
+  async function sendOtp() {
+    const phone = document.getElementById('phone').value.trim();
+    if (!phone) return alert('Please enter phone number');
+
+    try {
+      const res = await fetch(`${backend}/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone })
+      });
+      const data = await res.json();
+      if (data.success) {
+        document.getElementById('step1').classList.add('hidden');
+        document.getElementById('step2').classList.remove('hidden');
+        document.getElementById('msg').textContent = 'OTP sent to WhatsApp!';
+      } else throw new Error(data.error || 'Failed to send OTP');
+    } catch (err) {
+      document.getElementById('msg').textContent = 'Error: ' + err.message;
+    }
+  }
+
+  async function verifyOtp() {
+    const phone = document.getElementById('phone').value.trim();
+    const otp   = document.getElementById('otp').value.trim();
+    if (!otp) return alert('Please enter OTP');
+
+    try {
+      const res = await fetch(`${backend}/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, otp })
+      });
+      const data = await res.json();
+      if (data.verified) {
+        document.getElementById('msg').textContent = '✅ OTP Verified!';
+      } else {
+        throw new Error(data.error || 'Invalid OTP');
+      }
+    } catch (err) {
+      document.getElementById('msg').textContent = 'Error: ' + err.message;
+    }
+  }
+</script>
+</body>
+</html>
