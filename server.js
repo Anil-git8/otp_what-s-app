@@ -121,5 +121,9 @@ app.post('/verify-otp', (req, res) => {
     res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
   }
 });
+app.get('/ping', (req, res) => {
+  res.send('OK');
+});
+
 
 app.listen(PORT || 5000, () => console.log(`✅ Server running on port ${PORT || 5000}`));
