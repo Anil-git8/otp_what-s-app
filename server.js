@@ -12,61 +12,32 @@ app.use(cors());
 
 const { PORT, API_KEY, PHONE_NUMBER_ID, TEMPLATE_NAME, FINANALYZ_API } = process.env;
 
-// ✅ Send OTP (Instant Response)
+// ----------------------------------------------------
+// ✅ SUPER FAST OTP — respond instantly, send in background
+// ----------------------------------------------------
 app.post('/send-otp', async (req, res) => {
   const { phone } = req.body;
-  if (!phone) return res.status(400).json({ error: 'Phone number required' });
+  if (!phone) {
+    return res.status(400).json({ error: 'Phone number required' });
+  }
 
-  // Generate random 6-digit OTP
+  // Generate OTP instantly
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-  // ✅ Save OTP immediately
+  // Save OTP immediately
   setOTP(phone, otp);
 
-  // ✅ Respond instantly to frontend
+  // 👉 Instant response to UI (0.1 sec)
   res.json({ success: true, message: 'OTP generation started' });
 
-  // ✅ Send WhatsApp message asynchronously
-  axios.post(`${FINANALYZ_API}/send-authentication-template-message`, {
-    apikey: API_KEY,
-    phone_number_id: PHONE_NUMBER_ID,
-    body: {
-      messaging_product: "whatsapp",
-      recipient_type: "individual",
-      to: phone,
-      type: "template",
-      template: {
-        name: TEMPLATE_NAME,
-        language: { code: "en_US" },
-        components: [
-          {
-            type: "body",
-            parameters: [{ type: "text", text: otp }]
-          },
-          {
-            type: "button",
-            sub_type: "url",
-            index: "0",
-            parameters: [{ type: "text", text: otp }]
-          }
-        ]
-      }
-    }
-  })
-  .then(() => console.log(`✅ OTP sent to ${phone}: ${otp}`))
-  .catch(err => console.error('❌ WhatsApp sending failed:', err.response?.data || err.message));
+  // 👉 Send WhatsApp OTP in background (non-blocking)
+  sendOTPWhatsApp(phone, otp);
 });
 
-
-
-// ✅ Send OTP
-app.post('/send-otp', async (req, res) => {
-  const { phone } = req.body;
-  if (!phone) return res.status(400).json({ error: 'Phone number required' });
-
-  // Generate random 6-digit OTP
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
+// ----------------------------------------------------
+// BACKGROUND FUNCTION — does NOT slow response!
+// ----------------------------------------------------
+async function sendOTPWhatsApp(phone, otp) {
   try {
     await axios.post(`${FINANALYZ_API}/send-authentication-template-message`, {
       apikey: API_KEY,
@@ -95,20 +66,18 @@ app.post('/send-otp', async (req, res) => {
       }
     });
 
-    // ✅ Save OTP in memory
-    setOTP(phone, otp);
     console.log(`✅ OTP sent to ${phone}: ${otp}`);
-    res.json({ success: true, message: 'OTP sent successfully' });
-
   } catch (error) {
-    console.error('❌ Error sending OTP:', error.response?.data || error.message);
-    res.status(500).json({ error: 'Failed to send OTP' });
+    console.error("❌ WhatsApp sending failed:", error.response?.data || error.message);
   }
-});
+}
 
-// ✅ Verify OTP
+// ----------------------------------------------------
+// Verify OTP
+// ----------------------------------------------------
 app.post('/verify-otp', (req, res) => {
   const { phone, otp } = req.body;
+
   if (!phone || !otp) {
     return res.status(400).json({ success: false, message: 'Phone and OTP required' });
   }
@@ -121,9 +90,12 @@ app.post('/verify-otp', (req, res) => {
     res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
   }
 });
+
+// ----------------------------------------------------
 app.get('/ping', (req, res) => {
   res.send('OK');
 });
 
-
-app.listen(PORT || 5000, () => console.log(`✅ Server running on port ${PORT || 5000}`));
+app.listen(PORT || 5000, () => {
+  console.log(`🚀 Server running on port ${PORT || 5000}`);
+});
