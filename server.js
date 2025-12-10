@@ -108,29 +108,6 @@ async function warmUpWhatsAppAPI() {
   try {
     console.log(`🔥 Warming up WhatsApp API using ${lastPhoneNumber}...`);
 
-    await axios.post(`${FINANALYZ_API}/send-authentication-template-message`, {
-      apikey: API_KEY,
-      phone_number_id: PHONE_NUMBER_ID,
-      body: {
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
-        to: lastPhoneNumber,
-        type: "template",
-        template: {
-          name: TEMPLATE_NAME,
-          language: { code: "en_US" },
-          components: [
-            { type: "body", parameters: [{ type: "text", text: "000000" }] },
-            {
-              type: "button",
-              sub_type: "url",
-              index: "0",
-              parameters: [{ type: "text", text: "000000" }]
-            }
-          ]
-        }
-      }
-    });
 
     console.log("🔥 Warm-up successful.");
 
