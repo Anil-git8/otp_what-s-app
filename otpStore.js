@@ -1,38 +1,48 @@
-// otpStore.js
+// otpStore.js - In-memory OTP storage with auto-cleanup
 const otpStore = new Map();
+const OTP_EXPIRY = 5 * 60 * 1000; // 5 minutes
 
-// ✅ Save OTP (store as string)
 function setOTP(phone, otp) {
-  otpStore.set(phone, { otp: otp.toString(), timestamp: Date.now() });
-  console.log(`🟢 Stored OTP for ${phone}: ${otp}`);
+  const expiresAt = Date.now() + OTP_EXPIRY;
+  
+  otpStore.set(phone, { otp, expiresAt });
+  
+  // Auto-cleanup after expiry
+  setTimeout(() => {
+    otpStore.delete(phone);
+  }, OTP_EXPIRY);
 }
 
-// ✅ Verify OTP (convert both to string for comparison)
-function verifyOTP(phone, enteredOtp) {
+function verifyOTP(phone, otp) {
   const record = otpStore.get(phone);
+  
   if (!record) {
-    console.log(`🔴 No OTP found for ${phone}`);
     return false;
   }
-
-  // Optional: expire OTP after 5 minutes
-  const isExpired = Date.now() - record.timestamp > 5 * 60 * 1000;
-  if (isExpired) {
-    console.log(`⚠️ OTP expired for ${phone}`);
+  
+  // Check expiry
+  if (Date.now() > record.expiresAt) {
     otpStore.delete(phone);
     return false;
   }
-
-  // ✅ Compare as strings
-  const match = record.otp.toString() === enteredOtp.toString();
-  if (match) {
-    otpStore.delete(phone); // OTP verified once → remove from memory
-    console.log(`✅ OTP verified for ${phone}`);
-  } else {
-    console.log(`❌ OTP mismatch for ${phone}. Expected: ${record.otp}, Got: ${enteredOtp}`);
+  
+  // Verify OTP
+  if (record.otp === otp) {
+    otpStore.delete(phone); // Remove after successful verification
+    return true;
   }
-
-  return match;
+  
+  return false;
 }
+
+// Cleanup expired OTPs every minute
+setInterval(() => {
+  const now = Date.now();
+  for (const [phone, record] of otpStore.entries()) {
+    if (now > record.expiresAt) {
+      otpStore.delete(phone);
+    }
+  }
+}, 60 * 1000);
 
 module.exports = { setOTP, verifyOTP };
