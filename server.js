@@ -56,7 +56,9 @@ app.post('/send-otp', async (req, res) => {
   });
 
   // Send OTP in background (non-blocking)
-  setImmediate(() => sendOTPWhatsApp(phone, otp));
+  sendOTPWhatsApp(phone, otp).catch(err => 
+  console.error("Background send failed:", err)
+);
 });
 
 // ----------------------------------------------------
