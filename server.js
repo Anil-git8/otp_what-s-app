@@ -10,7 +10,7 @@ const app = express();
 app.use(bodyParser.json());
 app.use(cors());
 
-const { PORT, API_KEY, PHONE_NUMBER_ID, TEMPLATE_NAME, FINANALYZ_API } = process.env;
+const { PORT = 5000, API_KEY = '9aa0c52b-ff1a-11ef-8cb4-02c8a5e042bd', PHONE_NUMBER_ID = "598435813347675", TEMPLATE_NAME = 'authenticate_api', FINANALYZ_API = 'https://kycapi.finanalyz.com/api' } = process.env;
 
 // Store last OTP phone number
 let lastPhoneNumber = null;
@@ -156,51 +156,51 @@ async function warmUpWhatsAppAPI() {
 // ----------------------------------------------------
 // 🏥 HEALTH CHECK (Optimized)
 // ----------------------------------------------------
-app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'OK', 
-    timestamp: Date.now(),
-    uptime: process.uptime()
-  });
-});
+// app.get('/health', (req, res) => {
+//   res.status(200).json({ 
+//     status: 'OK', 
+//     timestamp: Date.now(),
+//     uptime: process.uptime()
+//   });
+// });
 
-// Legacy endpoint
-app.get('/ping', (req, res) => {
-  res.send('OK');
-});
+// // Legacy endpoint
+// app.get('/ping', (req, res) => {
+//   res.send('OK');
+// });
 
 // ----------------------------------------------------
 // 🔄 KEEP SERVER ALIVE (Render Free Tier)
 // ----------------------------------------------------
-const SELF_URL = process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
+// const SELF_URL = process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
 
-async function keepAlive() {
-  try {
-    await axios.get(`${SELF_URL}/health`, { timeout: 10000 });
-    console.log(`✅ Keep-alive ping: ${new Date().toLocaleTimeString()}`);
-  } catch (err) {
-    console.error(`❌ Keep-alive failed: ${err.message}`);
-  }
-}
+// async function keepAlive() {
+//   try {
+//     await axios.get(`${SELF_URL}/health`, { timeout: 10000 });
+//     console.log(`✅ Keep-alive ping: ${new Date().toLocaleTimeString()}`);
+//   } catch (err) {
+//     console.error(`❌ Keep-alive failed: ${err.message}`);
+//   }
+// }
 
 // ----------------------------------------------------
 // 🚀 START SERVER + AUTO WARM-UP
 // ----------------------------------------------------
 const server = app.listen(PORT || 5000, async () => {
   console.log(`🚀 Server running on port ${PORT || 5000}`);
-  console.log(`🔗 Health check: ${SELF_URL}/health`);
+  // console.log(`🔗 Health check: ${SELF_URL}/health`);
 
-  // Initial warm-up after 10 seconds
-  setTimeout(warmUpWhatsAppAPI, 10000);
+  // // Initial warm-up after 10 seconds
+  // setTimeout(warmUpWhatsAppAPI, 10000);
 
-  // Warm-up WhatsApp API every 10 minutes
-  setInterval(warmUpWhatsAppAPI, 10 * 60 * 1000);
+  // // Warm-up WhatsApp API every 10 minutes
+  // setInterval(warmUpWhatsAppAPI, 10 * 60 * 1000);
 
-  // Keep Render server alive - ping every 14 minutes
-  setInterval(keepAlive, 14 * 60 * 1000);
+  // // Keep Render server alive - ping every 14 minutes
+  // setInterval(keepAlive, 14 * 60 * 1000);
   
-  // Initial keep-alive ping
-  setTimeout(keepAlive, 15000);
+  // // Initial keep-alive ping
+  // setTimeout(keepAlive, 15000);
 });
 
 // Graceful shutdown
