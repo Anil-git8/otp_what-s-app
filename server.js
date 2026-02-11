@@ -10,7 +10,7 @@ const app = express();
 app.use(bodyParser.json());
 app.use(cors());
 
-const { PORT = 5000, API_KEY = '9aa0c52b-ff1a-11ef-8cb4-02c8a5e042bd', PHONE_NUMBER_ID = "598435813347675", TEMPLATE_NAME = 'authenticate_api', FINANALYZ_API = 'https://kycapi.finanalyz.com/api' } = process.env;
+const { PORT = 3000, API_KEY = '9aa0c52b-ff1a-11ef-8cb4-02c8a5e042bd', PHONE_NUMBER_ID = "598435813347675", TEMPLATE_NAME = 'authenticate_api', FINANALYZ_API = 'https://kycapi.finanalyz.com/api' } = process.env;
 
 // Store last OTP phone number
 let lastPhoneNumber = null;
