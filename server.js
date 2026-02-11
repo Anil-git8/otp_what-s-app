@@ -7,26 +7,85 @@ const cors = require('cors');
 const { setOTP, verifyOTP } = require('./otpStore');
 
 const app = express();
+
+// ==========================================
+// 🔒 CORS CONFIGURATION - CRITICAL FIX
+// ==========================================
+
+const allowedOrigins = [
+  'https://folkexclusive.com',
+  'https://www.folkexclusive.com',
+  'http://localhost:4200',
+  'http://localhost:3000',
+];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('Blocked by CORS:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
+// This single line handles ALL CORS including preflight
+app.use(cors(corsOptions));
+
+// ❌ REMOVE THIS LINE - it causes the error
+// app.options('*', cors(corsOptions));
+
 app.use(bodyParser.json());
-app.use(cors());
 
-const { PORT = 3000, API_KEY = '9aa0c52b-ff1a-11ef-8cb4-02c8a5e042bd', PHONE_NUMBER_ID = "598435813347675", TEMPLATE_NAME = 'authenticate_api', FINANALYZ_API = 'https://kycapi.finanalyz.com/api' } = process.env;
+// ==========================================
+// 🚀 HEALTH CHECK (Add this!)
+// ==========================================
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    env: process.env.NODE_ENV || 'development'
+  });
+});
 
-// Store last OTP phone number
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'WhatsApp OTP API Server',
+    version: '1.0.0',
+    endpoints: ['/send-otp', '/verify-otp', '/health']
+  });
+});
+
+const { 
+  PORT = 3000, 
+  API_KEY = '9aa0c52b-ff1a-11ef-8cb4-02c8a5e042bd', 
+  PHONE_NUMBER_ID = "598435813347675", 
+  TEMPLATE_NAME = 'authenticate_api', 
+  FINANALYZ_API = 'https://kycapi.finanalyz.com/api' 
+} = process.env;
+
 let lastPhoneNumber = null;
 
-// Axios instance with optimized settings
 const whatsappAPI = axios.create({
-  timeout: 30000, // 30 second timeout
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
   }
 });
 
-// ----------------------------------------------------
-// 🚀 SUPER-FAST OTP — respond instantly, send in background
-// ----------------------------------------------------
+// ==========================================
+// 📱 SEND OTP
+// ==========================================
 app.post('/send-otp', async (req, res) => {
   const { phone } = req.body;
 
@@ -34,36 +93,51 @@ app.post('/send-otp', async (req, res) => {
     return res.status(400).json({ error: 'Phone number required' });
   }
 
-  // Validate phone format (basic check)
   if (!/^\d{10,15}$/.test(phone)) {
     return res.status(400).json({ error: 'Invalid phone number format' });
   }
 
-  // Save last used phone number for dynamic warm-up
   lastPhoneNumber = phone;
-
-  // Generate OTP instantly
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
-  // Save OTP temporarily
   setOTP(phone, otp);
 
-  // Respond immediately (sub-second response)
+  // Respond immediately
   res.json({ 
     success: true, 
     message: 'OTP sent',
-    expiresIn: 300 // 5 minutes
+    expiresIn: 300 
   });
 
-  // Send OTP in background (non-blocking)
+  // Send in background
   sendOTPWhatsApp(phone, otp).catch(err => 
-  console.error("Background send failed:", err)
-);
+    console.error("Background send failed:", err.message)
+  );
 });
 
-// ----------------------------------------------------
-// 🔥 SEND WHATSAPP OTP (Background)
-// ----------------------------------------------------
+// ==========================================
+// ✅ VERIFY OTP
+// ==========================================
+app.post('/verify-otp', (req, res) => {
+  const { phone, otp } = req.body;
+
+  if (!phone || !otp) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Phone and OTP required' 
+    });
+  }
+
+  const verified = verifyOTP(phone, otp);
+
+  res.json({ 
+    success: verified, 
+    message: verified ? 'OTP verified successfully' : 'Invalid or expired OTP' 
+  });
+});
+
+// ==========================================
+// 📤 WHATSAPP SEND FUNCTION
+// ==========================================
 async function sendOTPWhatsApp(phone, otp) {
   try {
     const response = await whatsappAPI.post(
@@ -96,118 +170,25 @@ async function sendOTPWhatsApp(phone, otp) {
       }
     );
 
-    console.log(`✅ OTP sent to ${phone}: ${otp} at ${new Date().toLocaleTimeString()}`);
+    console.log(`✅ OTP sent to ${phone}: ${otp}`);
 
   } catch (error) {
-    console.error("❌ OTP sending failed:", error.response?.data || error.message);
-    // Optional: Implement retry logic here if needed
+    console.error("❌ WhatsApp API failed:", error.response?.data || error.message);
   }
 }
 
-// ----------------------------------------------------
-// ⚡ OTP VERIFY (Optimized)
-// ----------------------------------------------------
-app.post('/verify-otp', (req, res) => {
-  const { phone, otp } = req.body;
-
-  if (!phone || !otp) {
-    return res.status(400).json({ 
-      success: false, 
-      message: 'Phone and OTP required' 
-    });
-  }
-
-  const verified = verifyOTP(phone, otp);
-
-  if (verified) {
-    res.json({ 
-      success: true, 
-      message: 'OTP verified successfully' 
-    });
-  } else {
-    res.status(400).json({ 
-      success: false, 
-      message: 'Invalid or expired OTP' 
-    });
-  }
-});
-
-// ----------------------------------------------------
-// ⚡ LIGHTWEIGHT WARM-UP (No actual OTP send)
-// ----------------------------------------------------
-async function warmUpWhatsAppAPI() {
-  try {
-    console.log(`🔥 Warming up at ${new Date().toLocaleTimeString()}...`);
-    
-    // Just ping the WhatsApp API endpoint to keep connection alive
-    await whatsappAPI.head(FINANALYZ_API, {
-      timeout: 5000
-    }).catch(() => {
-      // Silently fail - warmup is best-effort
-    });
-
-    console.log("✅ Warm-up complete");
-
-  } catch (error) {
-    console.error("⚠ Warm-up failed (non-critical)");
-  }
-}
-
-// ----------------------------------------------------
-// 🏥 HEALTH CHECK (Optimized)
-// ----------------------------------------------------
-// app.get('/health', (req, res) => {
-//   res.status(200).json({ 
-//     status: 'OK', 
-//     timestamp: Date.now(),
-//     uptime: process.uptime()
-//   });
-// });
-
-// // Legacy endpoint
-// app.get('/ping', (req, res) => {
-//   res.send('OK');
-// });
-
-// ----------------------------------------------------
-// 🔄 KEEP SERVER ALIVE (Render Free Tier)
-// ----------------------------------------------------
-// const SELF_URL = process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
-
-// async function keepAlive() {
-//   try {
-//     await axios.get(`${SELF_URL}/health`, { timeout: 10000 });
-//     console.log(`✅ Keep-alive ping: ${new Date().toLocaleTimeString()}`);
-//   } catch (err) {
-//     console.error(`❌ Keep-alive failed: ${err.message}`);
-//   }
-// }
-
-// ----------------------------------------------------
-// 🚀 START SERVER + AUTO WARM-UP
-// ----------------------------------------------------
-const server = app.listen(PORT || 5000, async () => {
-  console.log(`🚀 Server running on port ${PORT || 5000}`);
-  // console.log(`🔗 Health check: ${SELF_URL}/health`);
-
-  // // Initial warm-up after 10 seconds
-  // setTimeout(warmUpWhatsAppAPI, 10000);
-
-  // // Warm-up WhatsApp API every 10 minutes
-  // setInterval(warmUpWhatsAppAPI, 10 * 60 * 1000);
-
-  // // Keep Render server alive - ping every 14 minutes
-  // setInterval(keepAlive, 14 * 60 * 1000);
-  
-  // // Initial keep-alive ping
-  // setTimeout(keepAlive, 15000);
+// ==========================================
+// 🚀 START SERVER
+// ==========================================
+const server = app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
+  console.log(`📋 Allowed origins:`, allowedOrigins);
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down gracefully...');
   server.close(() => {
-    console.log('Server closed');
     process.exit(0);
   });
-});
+});                   
