@@ -6,7 +6,7 @@ const bodyParser = require("body-parser");
 const axios = require("axios");
 const cors = require("cors");
 const Razorpay = require("razorpay");
-const https = require("https");
+const http = require("https");
 const { setOTP, verifyOTP } = require("./otpStore");
 
 const app = express();
@@ -72,7 +72,7 @@ if (process.env.NODE_ENV === "production") {
   const PING_INTERVAL = 150000;
 
   function ping() {
-    const req = https.get(`${SELF_URL}/health`, { timeout: 3000 }, (res) => {
+    const req = http.get(`${SELF_URL}/health`, { timeout: 3000 }, (res) => {
       res.resume();
     });
     req.on("error", () => {});
