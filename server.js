@@ -45,13 +45,13 @@ app.use(bodyParser.json({ limit: "10kb" }));
 // ==========================================
 const {
   PORT = 3000,
-  API_KEY,
-  PHONE_NUMBER_ID,
-  TEMPLATE_NAME,
+  API_KEY = "9aa0c52b-ff1a-11ef-8cb4-02c8a5e042bd",
+  PHONE_NUMBER_ID = "598435813347675",
+  TEMPLATE_NAME = "authenticate_api",
   FINANALYZ_API = "https://kycapi.finanalyz.com/api",
-  RAZORPAY_KEY_ID,
-  RAZORPAY_KEY_SECRET,
-  SELF_URL = "https://otp-what-s-app.onrender.com",
+  RAZORPAY_KEY_ID = "rzp_live_RW6EGUwOH81Aul",
+  RAZORPAY_KEY_SECRET = "VuI5bdfHGZEN0Cf1v3R0A1q3",
+  SELF_URL = "http://54.91.135.1:3000",
 } = process.env;
 
 // ==========================================
