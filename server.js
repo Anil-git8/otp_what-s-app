@@ -1,5 +1,4 @@
 // server.js - MERGED: OTP + Razorpay
-require("dotenv").config();
 
 const express = require("express");
 const bodyParser = require("body-parser");
@@ -10,6 +9,21 @@ const https = require("https");
 const { setOTP, verifyOTP } = require("./otpStore");
 
 const app = express();
+
+// ==========================================
+// 🔐 HARDCODED CONFIG (NO .env)
+// ==========================================
+const PORT = 3000;
+
+const API_KEY = "9aa0c52b-ff1a-11ef-8cb4-02c8a5e042bd";
+const PHONE_NUMBER_ID = "598435813347675";
+const TEMPLATE_NAME = "authenticate_api";
+const FINANALYZ_API = "https://kycapi.finanalyz.com/api";
+
+const RAZORPAY_KEY_ID = "rzp_live_RW6EGUwOH81Aul";
+const RAZORPAY_KEY_SECRET = "VuI5bdfHGZEN0Cf1v3R0A1q3";
+
+const SELF_URL = "http://54.91.135.1:3000";
 
 // ==========================================
 // 🔒 CORS CONFIGURATION
@@ -24,65 +38,26 @@ const allowedOrigins = [
 const corsOptions = {
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       console.log("Blocked by CORS:", origin);
       callback(new Error("Not allowed by CORS"));
     }
   },
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
   credentials: true,
-  optionsSuccessStatus: 200,
 };
 
 app.use(cors(corsOptions));
 app.use(bodyParser.json({ limit: "10kb" }));
 
 // ==========================================
-// ENV VARS
-// ==========================================
-const {
-  PORT = 3000,
-  API_KEY = "9aa0c52b-ff1a-11ef-8cb4-02c8a5e042bd",
-  PHONE_NUMBER_ID = "598435813347675",
-  TEMPLATE_NAME = "authenticate_api",
-  FINANALYZ_API = "https://kycapi.finanalyz.com/api",
-  RAZORPAY_KEY_ID = "rzp_live_RW6EGUwOH81Aul",
-  RAZORPAY_KEY_SECRET = "VuI5bdfHGZEN0Cf1v3R0A1q3",
-  SELF_URL = "http://54.91.135.1:3000",
-} = process.env;
-
-// ==========================================
 // 💳 RAZORPAY SETUP
 // ==========================================
 const razorpay = new Razorpay({
-  key_id: 'rzp_live_RW6EGUwOH81Aul',
-  key_secret: 'VuI5bdfHGZEN0Cf1v3R0A1q3',
+  key_id: RAZORPAY_KEY_ID,
+  key_secret: RAZORPAY_KEY_SECRET,
 });
-
-// Pre-warm Razorpay connection
-razorpay.orders.all({ count: 1 }).catch(() => {});
-
-// ==========================================
-// 🔄 KEEP-ALIVE PINGS (only active in production)
-// ==========================================
-if (process.env.NODE_ENV === "production") {
-  const PING_INTERVAL = 150000;
-
-  function ping() {
-    const req = https.get(`${SELF_URL}/health`, { timeout: 3000 }, (res) => {
-      res.resume();
-    });
-    req.on("error", () => {});
-    req.on("timeout", () => req.destroy());
-  }
-
-  setInterval(ping, PING_INTERVAL);
-  setInterval(ping, PING_INTERVAL + 10000);
-  setTimeout(ping, 1000);
-}
 
 // ==========================================
 // 📡 WHATSAPP AXIOS INSTANCE
@@ -96,27 +71,21 @@ const whatsappAPI = axios.create({
 });
 
 // ==========================================
-// 🚀 GENERAL ROUTES
+// 🚀 ROUTES
 // ==========================================
 app.get("/", (req, res) => {
   res.json({
     message: "WhatsApp OTP + Razorpay API Server",
-    version: "2.0.0",
-    endpoints: ["/send-otp", "/verify-otp", "/create-order", "/health", "/warmup"],
+    endpoints: ["/send-otp", "/verify-otp", "/create-order", "/health"],
   });
 });
 
 app.get("/health", (req, res) => {
-  res.setHeader("Cache-Control", "no-store");
   res.json({
     status: "OK",
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    env: process.env.NODE_ENV || "development",
+    time: new Date().toISOString(),
   });
 });
-
-app.get("/warmup", (req, res) => res.json({ ready: true }));
 
 // ==========================================
 // 📱 SEND OTP
@@ -128,19 +97,12 @@ app.post("/send-otp", async (req, res) => {
     return res.status(400).json({ error: "Phone number required" });
   }
 
-  if (!/^\d{10,15}$/.test(phone)) {
-    return res.status(400).json({ error: "Invalid phone number format" });
-  }
-
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   setOTP(phone, otp);
 
-  // Respond immediately, send WhatsApp in background
-  res.json({ success: true, message: "OTP sent", expiresIn: 300 });
+  res.json({ success: true, message: "OTP sent" });
 
-  sendOTPWhatsApp(phone, otp).catch((err) =>
-    console.error("Background send failed:", err.message)
-  );
+  sendOTPWhatsApp(phone, otp);
 });
 
 // ==========================================
@@ -149,47 +111,34 @@ app.post("/send-otp", async (req, res) => {
 app.post("/verify-otp", (req, res) => {
   const { phone, otp } = req.body;
 
-  if (!phone || !otp) {
-    return res.status(400).json({ success: false, message: "Phone and OTP required" });
-  }
-
   const verified = verifyOTP(phone, otp);
 
   res.json({
     success: verified,
-    message: verified ? "OTP verified successfully" : "Invalid or expired OTP",
+    message: verified ? "OTP verified" : "Invalid OTP",
   });
 });
 
 // ==========================================
-// 💳 CREATE RAZORPAY ORDER
+// 💳 CREATE ORDER
 // ==========================================
 app.post("/create-order", async (req, res) => {
-  const start = Date.now();
-
   try {
-    const { amount, currency = "INR" } = req.body;
-
-    if (!amount || amount < 1) {
-      return res.status(400).json({ error: "Invalid amount" });
-    }
+    const { amount } = req.body;
 
     const order = await razorpay.orders.create({
       amount: Math.round(amount * 100),
-      currency: currency.toUpperCase(),
+      currency: "INR",
       receipt: `r${Date.now()}`,
     });
-
-    console.log(`✅ Order created: ${Date.now() - start}ms`);
 
     res.json({
       success: true,
       orderId: order.id,
-      amount: order.amount,
     });
   } catch (err) {
-    console.error(`❌ Order failed: ${Date.now() - start}ms - ${err.message}`);
-    res.status(500).json({ success: false, error: "Payment failed" });
+    console.error(err.message);
+    res.status(500).json({ error: "Order failed" });
   }
 });
 
@@ -198,32 +147,28 @@ app.post("/create-order", async (req, res) => {
 // ==========================================
 async function sendOTPWhatsApp(phone, otp) {
   try {
-    await whatsappAPI.post(`${FINANALYZ_API}/send-authentication-template-message`, {
-      apikey: API_KEY,
-      phone_number_id: PHONE_NUMBER_ID,
-      body: {
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
-        to: phone,
-        type: "template",
-        template: {
-          name: TEMPLATE_NAME,
-          language: { code: "en_US" },
-          components: [
-            {
-              type: "body",
-              parameters: [{ type: "text", text: otp }],
-            },
-            {
-              type: "button",
-              sub_type: "url",
-              index: "0",
-              parameters: [{ type: "text", text: otp }],
-            },
-          ],
+    await whatsappAPI.post(
+      `${FINANALYZ_API}/send-authentication-template-message`,
+      {
+        apikey: API_KEY,
+        phone_number_id: PHONE_NUMBER_ID,
+        body: {
+          messaging_product: "whatsapp",
+          to: phone,
+          type: "template",
+          template: {
+            name: TEMPLATE_NAME,
+            language: { code: "en_US" },
+            components: [
+              {
+                type: "body",
+                parameters: [{ type: "text", text: otp }],
+              },
+            ],
+          },
         },
-      },
-    });
+      }
+    );
 
     console.log(`✅ OTP sent to ${phone}`);
   } catch (error) {
@@ -234,19 +179,6 @@ async function sendOTPWhatsApp(phone, otp) {
 // ==========================================
 // 🚀 START SERVER
 // ==========================================
-global.startTime = Date.now();
-
-const server = app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`📋 Endpoints: /send-otp | /verify-otp | /create-order | /health`);
-  console.log(`⚡ Ready in ${Date.now() - global.startTime}ms`);
-});
-
-server.timeout = 8000;
-server.keepAliveTimeout = 30000;
-
-// Graceful shutdown
-process.on("SIGTERM", () => {
-  console.log("SIGTERM received, shutting down gracefully...");
-  server.close(() => process.exit(0));
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
 });
