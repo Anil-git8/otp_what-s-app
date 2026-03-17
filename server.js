@@ -51,7 +51,7 @@ const {
   FINANALYZ_API = "https://kycapi.finanalyz.com/api",
   RAZORPAY_KEY_ID,
   RAZORPAY_KEY_SECRET,
-  SELF_URL = "https://otp-what-s-app.onrender.com",
+  SELF_URL = "http://54.91.135.1:3000",
 } = process.env;
 
 // ==========================================
